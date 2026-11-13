@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grammar Quest: Ranked 1v1 & 20 Levels</title>
+<!-- PeerJS for instant P2P 1v1 over Wi-Fi/Internet without needing a backend server -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  /* Light & Dark Theme Variables */
+  :root {
+    --primary: #4F46E5;
+    --primary-dark: #3730A3;
+    --bg: #F3F4F6;
+    --card: #FFFFFF;
+    --text: #1F2937;
+    --muted: #6B7280;
+    --border: #E5E7EB;
+    --correct: #10B981;
+    --correct-bg: #D1FAE5;
+    --wrong: #EF4444;
+    --wrong-bg: #FEE2E2;
+    --gold: #F59E0B;
+    --tab-bg: #F3F4F6;
+    --card-hover: #EEF2FF;
+  }
+
+  [data-theme="dark"] {
+    --primary: #6366F1;
+    --primary-dark: #818CF8;
+    --bg: #111827;
+    --card: #1F2937;
+    --text: #F9FAFB;
+    --muted: #9CA3AF;
+    --border: #374151;
+    --correct: #34D399;
+    --correct-bg: #064E3B;
+    --wrong: #F87171;
+    --wrong-bg: #7F1D1D;
+    --gold: #FBBF24;
+    --tab-bg: #374151;
+    --card-hover: #312E81;
+  }
+
+  * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; transition: background-color 0.2s, border-color 0.2s, color 0.2s; }
+  body { background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 16px; }
+  .app { background: var(--card); max-width: 760px; width: 100%; border-radius: 18px; box-shadow: 0 12px 30px rgba(0,0,0,0.15); padding: 28px; border: 1px solid var(--border); }
+  
+  /* Header & Rank Card */
+  .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 2px solid var(--border); padding-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+  h1 { color: var(--primary); font-size: 1.55rem; }
+  
+  .rank-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 99px; font-weight: 800; font-size: 0.85rem; border: 2px solid currentColor; }
+  .r-bronze { color: #D97706; background: rgba(245, 158, 11, 0.15); }
+  .r-silver { color: #9CA3AF; background: rgba(156, 163, 175, 0.15); }
+  .r-gold { color: #F59E0B; background: rgba(245, 158, 11, 0.15); }
+  .r-platinum { color: #14B8A6; background: rgba(20, 184, 166, 0.15); }
+  .r-diamond { color: #3B82F6; background: rgba(59, 130, 246, 0.15); }
+  .r-master { color: #8B5CF6; background: rgba(139, 92, 246, 0.15); }
+
+  /* Tabs */
+  .nav-tabs { display: flex; gap: 6px; margin-bottom: 20px; background: var(--tab-bg); padding: 6px; border-radius: 12px; }
+  .tab-btn { flex: 1; padding: 10px 4px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; background: transparent; color: var(--muted); font-size: 0.9rem; }
+  .tab-btn.active { background: var(--card); color: var(--primary); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+
+  /* Level Grid */
+  .level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(125px, 1fr)); gap: 12px; max-height: 58vh; overflow-y: auto; padding-right: 4px; }
+  .lvl-card { border: 2px solid var(--border); border-radius: 12px; padding: 12px 8px; text-align: center; cursor: pointer; background: var(--card); }
+  .lvl-card:hover:not(.locked) { border-color: var(--primary); transform: translateY(-2px); background: var(--card-hover); }
+  .lvl-card.locked { opacity: 0.5; cursor: not-allowed; }
+  .lvl-card.completed { border-color: var(--correct); }
+  .lvl-num { font-size: 1.15rem; font-weight: 800; color: var(--primary); }
+  .lvl-card.locked .lvl-num { color: var(--muted); }
+  .lvl-title { font-size: 0.76rem; color: var(--muted); margin: 4px 0; font-weight: 600; height: 28px; display: flex; align-items: center; justify-content: center; }
+  .lvl-meta { font-size: 0.7rem; color: var(--muted); background: var(--tab-bg); padding: 2px 6px; border-radius: 6px; display: inline-block; }
+  .stars { color: var(--gold); font-size: 0.85rem; margin-top: 4px; letter-spacing: 2px; }
+
+  /* Buttons & Inputs */
+  .btn { background: var(--primary); color: white; border: none; padding: 14px 20px; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; width: 100%; transition: 0.2s; }
+  .btn:hover:not(:disabled) { background: var(--primary-dark); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-outline { background: var(--card); color: var(--primary); border: 2px solid var(--primary); }
+  .btn-outline:hover { background: var(--card-hover); }
+  .btn-sm { width: auto; padding: 8px 14px; font-size: 0.85rem; background: var(--tab-bg); color: var(--text); }
+  .btn-sm:hover { opacity: 0.8; }
+
+  input { width: 100%; padding: 12px 14px; border: 2px solid var(--border); background: var(--card); color: var(--text); border-radius: 10px; font-size: 1rem; font-weight: 600; margin-bottom: 12px; outline: none; }
+  input:focus { border-color: var(--primary); }
+
+  /* 1v1 Arena */
+  .arena-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+  .arena-card { border: 2px solid var(--border); border-radius: 14px; padding: 20px; text-align: center; background: var(--tab-bg); }
+  .room-code-box { font-size: 2.2rem; font-weight: 900; letter-spacing: 4px; color: var(--primary); background: var(--card); padding: 14px; border-radius: 12px; margin: 14px 0; border: 2px dashed var(--primary); user-select: all; }
+  
+  /* Live Scoreboard Banner */
+  .versus-bar { display: flex; justify-content: space-between; align-items: center; background: var(--tab-bg); border: 1px solid var(--border); padding: 12px 18px; border-radius: 12px; margin-bottom: 16px; }
+  .p-box { display: flex; flex-direction: column; }
+  .p-name { font-size: 0.8rem; color: var(--muted); font-weight: 700; }
+  .p-score { font-size: 1.4rem; font-weight: 900; color: var(--correct); }
+  .p-opp .p-score { color: var(--wrong); }
+  .vs-badge { background: var(--card); padding: 4px 10px; border-radius: 8px; font-weight: 800; font-size: 0.85rem; color: var(--gold); border: 1px solid var(--border); }
+
+  /* Quiz UI */
+  .stats { display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+  .progress-wrap { width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 18px; }
+  .progress-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s; }
+  .q-text { font-size: 1.22rem; font-weight: 600; line-height: 1.5; margin-bottom: 18px; }
+  .blank { color: var(--primary); border-bottom: 3px solid var(--primary); padding: 0 8px; }
+  
+  .opt-btn { background: var(--card); color: var(--text); border: 2px solid var(--border); text-align: left; padding: 13px 16px; border-radius: 10px; font-size: 0.98rem; font-weight: 500; cursor: pointer; width: 100%; margin-bottom: 10px; display: flex; justify-content: space-between; }
+  .opt-btn:hover:not(:disabled) { border-color: var(--primary); background: var(--card-hover); }
+  .opt-btn:disabled { cursor: default; }
+  .opt-btn.correct { background: var(--correct-bg); border-color: var(--correct); color: var(--text); font-weight: 700; }
+  .opt-btn.wrong { background: var(--wrong-bg); border-color: var(--wrong); color: var(--text); }
+
+  .explanation { margin-top: 14px; padding: 12px 14px; border-radius: 10px; font-size: 0.9rem; line-height: 1.45; display: none; }
+  .explanation.show { display: block; }
+  .exp-ok { background: var(--correct-bg); color: var(--text); border-left: 4px solid var(--correct); }
+  .exp-no { background: var(--wrong-bg); color: var(--text); border-left: 4px solid var(--wrong); }
+
+  .tier-tag { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 3px 8px; border-radius: 4px; font-weight: 700; }
+  .t-beg { background: rgba(59, 130, 246, 0.15); color: #3B82F6; }
+  .t-int { background: rgba(245, 158, 11, 0.15); color: #F59E0B; }
+  .t-adv { background: rgba(236, 72, 153, 0.15); color: #EC4899; }
+  .t-mas { background: rgba(139, 92, 246, 0.15); color: #8B5CF6; }
+
+  .result-box { text-align: center; padding: 16px 0; }
+  .big-score { font-size: 2.8rem; font-weight: 900; color: var(--primary); margin: 8px 0; }
+  .rp-change { font-size: 1.1rem; font-weight: 800; padding: 6px 14px; border-radius: 8px; display: inline-block; margin-bottom: 16px; }
+  .rp-up { background: var(--correct-bg); color: var(--text); }
+  .rp-down { background: var(--wrong-bg); color: var(--text); }
+
+  /* Settings Room Card */
+  .setting-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: var(--tab-bg); border-radius: 12px; margin-bottom: 12px; border: 1px solid var(--border); }
+  .toggle-switch { display: flex; background: var(--card); border: 2px solid var(--border); border-radius: 99px; padding: 3px; cursor: pointer; }
+  .toggle-option { padding: 8px 16px; border-radius: 99px; font-weight: 700; font-size: 0.85rem; color: var(--muted); }
+  .toggle-option.active { background: var(--primary); color: white; }
+
+  @media (max-width: 600px) {
+    .arena-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="app"></div>
+
+<script>
+// ==================== 20 LEVELS QUESTION BANK ====================
+const LEVELS = [
+  {
+    lvl: 1, title: "Articles & Basics", tier: "Beginner", tierClass: "t-beg",
+    questions: [
+      { q: "She adopted ___ adorable puppy yesterday.", opts: ["a", "an", "the", "no article"], a: 1, exp: "Use 'an' before words starting with a vowel sound ('adorable')." },
+      { q: "He wants to be ___ university professor.", opts: ["a", "an", "the", "some"], a: 0, exp: "'University' starts with a consonant 'yoo' sound, so use 'a'." },
+      { q: "___ sun rises in the east.", opts: ["A", "An", "The", "No article"], a: 2, exp: "Use 'The' for unique objects where only one exists." }
+    ]
+  },
+  {
+    lvl: 2, title: "Plural Nouns", tier: "Beginner", tierClass: "t-beg",
+    questions: [
+      { q: "Two ___ ran across the kitchen floor.", opts: ["mouses", "mice", "mouse", "mices"], a: 1, exp: "'Mice' is the irregular plural form of 'mouse'." },
+      { q: "Please put the books on those ___.", opts: ["shelfs", "shelfes", "shelves", "shelf"], a: 2, exp: "Nouns ending in -f or -fe usually change to -ves in the plural ('shelves')." },
+      { q: "The dentist checked all of my ___.", opts: ["tooths", "teeths", "tooth", "teeth"], a: 3, exp: "'Teeth' is the irregular plural form of 'tooth'." }
+    ]
+  },
+  {
+    lvl: 3, title: "Present Simple", tier: "Beginner", tierClass: "t-beg",
+    questions: [
+      { q: "Water ___ at 100 degrees Celsius.", opts: ["boil", "boils", "boiling", "is boil"], a: 1, exp: "Use Present Simple with -s for third-person singular facts ('Water boils')." },
+      { q: "They ___ coffee in the morning.", opts: ["doesn't drink", "not drink", "don't drink", "aren't drink"], a: 2, exp: "Use 'don't' + base verb for negative statements with 'they'." },
+      { q: "___ your brother play the guitar?", opts: ["Do", "Does", "Is", "Has"], a: 1, exp: "Use 'Does' to form questions for singular third-person subjects ('your brother')." },
+      { q: "She always ___ her homework before dinner.", opts: ["finish", "finishs", "finishes", "finishing"], a: 2, exp: "Verbs ending in -sh add -es in the third-person singular ('finishes')." }
+    ]
+  },
+  {
+    lvl: 4, title: "Past Simple", tier: "Beginner", tierClass: "t-beg",
+    questions: [
+      { q: "We ___ to Paris last summer.", opts: ["go", "goed", "went", "gone"], a: 2, exp: "'Went' is the irregular past simple form of 'go'." },
+      { q: "Did you ___ the email I sent you?", opts: ["received", "receive", "receives", "receiving"], a: 1, exp: "After 'Did', always use the base form of the verb ('receive')." },
+      { q: "He ___ his keys on the bus yesterday.", opts: ["losed", "lost", "lose", "losing"], a: 1, exp: "'Lost' is the irregular past tense of 'lose'." },
+      { q: "They ___ at the party last night.", opts: ["wasn't", "weren't", "didn't be", "not were"], a: 1, exp: "Use 'weren't' (were not) as the past negative of 'to be' for 'they'." }
+    ]
+  },
+  {
+    lvl: 5, title: "Pronouns", tier: "Beginner", tierClass: "t-beg",
+    questions: [
+      { q: "That blue backpack belongs to ___.", opts: ["I", "my", "me", "mine"], a: 2, exp: "Use the object pronoun 'me' after a preposition ('to')." },
+      { q: "The dog hurt ___ paw while jumping.", opts: ["it's", "its", "its'", "it"], a: 1, exp: "'Its' is the possessive pronoun; 'it's' means 'it is'." },
+      { q: "Sarah and ___ are going to the concert.", opts: ["me", "myself", "I", "mine"], a: 2, exp: "Use the subject pronoun 'I' when part of the subject performing the action." },
+      { q: "This laptop is ___, not yours.", opts: ["my", "me", "mine", "I"], a: 2, exp: "'Mine' is a standalone possessive pronoun that doesn't need a noun after it." },
+      { q: "He taught ___ how to play chess.", opts: ["hisself", "himself", "him", "he"], a: 1, exp: "Use the reflexive pronoun 'himself' when the subject and object are the same person." }
+    ]
+  },
+  {
+    lvl: 6, title: "Prepositions", tier: "Intermediate", tierClass: "t-int",
+    questions: [
+      { q: "The meeting starts ___ 9:30 AM sharp.", opts: ["in", "on", "at", "by"], a: 2, exp: "Use 'at' for exact clock times." },
+      { q: "My anniversary is ___ November 12th.", opts: ["in", "on", "at", "during"], a: 1, exp: "Use 'on' for specific dates and days of the week." },
+      { q: "She was born ___ 1998.", opts: ["on", "at", "in", "since"], a: 2, exp: "Use 'in' for months, years, and centuries." },
+      { q: "I left my phone ___ the kitchen table.", opts: ["in", "on", "at", "into"], a: 1, exp: "Use 'on' when something is resting on a flat surface." },
+      { q: "We waited for the train ___ two hours.", opts: ["since", "for", "during", "from"], a: 1, exp: "Use 'for' to express a duration of time." }
+    ]
+  },
+  {
+    lvl: 7, title: "Comparatives", tier: "Intermediate", tierClass: "t-int",
+    questions: [
+      { q: "This puzzle is much ___ than the last one.", opts: ["difficulter", "more difficult", "most difficult", "difficult"], a: 1, exp: "Adjectives with 3+ syllables use 'more' for comparatives." },
+      { q: "Mount Everest is the ___ mountain in the world.", opts: ["higher", "most high", "highest", "high"], a: 2, exp: "Short adjectives take -est for superlatives ('the highest')." },
+      { q: "Her new phone is ___ than her old one.", opts: ["gooder", "more good", "best", "better"], a: 3, exp: "'Better' is the irregular comparative form of 'good'." },
+      { q: "Today's weather is the ___ we've had all year.", opts: ["baddest", "worse", "worst", "most bad"], a: 2, exp: "'Worst' is the irregular superlative form of 'bad'." },
+      { q: "He runs ___ than anyone else on the team.", opts: ["fast", "faster", "more fast", "fastest"], a: 1, exp: "'Fast' is a one-syllable adverb/adjective that takes -er ('faster')." },
+      { q: "This is the ___ movie I have ever seen.", opts: ["more boring", "most boring", "boringer", "boringest"], a: 1, exp: "Adjectives ending in -ing use 'most' for superlatives." }
+    ]
+  },
+  {
+    lvl: 8, title: "Present Perfect", tier: "Intermediate", tierClass: "t-int",
+    questions: [
+      { q: "I ___ in Dubai since 2021.", opts: ["live", "lived", "have lived", "am living"], a: 2, exp: "Use Present Perfect ('have lived') for actions that began in the past and continue now." },
+      { q: "She ___ her keys yesterday afternoon.", opts: ["has lost", "lost", "have lost", "loses"], a: 1, exp: "Finished past time markers ('yesterday') require the Past Simple ('lost')." },
+      { q: "___ you ever eaten sushi?", opts: ["Did", "Have", "Are", "Were"], a: 1, exp: "Use Present Perfect ('Have you ever...') to ask about life experiences up to now." },
+      { q: "They ___ just finished painting the house.", opts: ["has", "have", "did", "were"], a: 1, exp: "Use 'have' + past participle with 'just' for very recent actions." },
+      { q: "Shakespeare ___ many famous plays.", opts: ["has written", "wrote", "writes", "was written"], a: 1, exp: "Use Past Simple ('wrote') for historical actions by people no longer alive." },
+      { q: "We haven't seen each other ___ graduation.", opts: ["for", "since", "ago", "during"], a: 1, exp: "Use 'since' before a specific point in time ('graduation')." }
+    ]
+  },
+  {
+    lvl: 9, title: "Modal Verbs", tier: "Intermediate", tierClass: "t-int",
+    questions: [
+      { q: "You ___ wear a seatbelt while driving; it's the law.", opts: ["might", "must", "could", "would"], a: 1, exp: "'Must' expresses strong obligation or legal necessity." },
+      { q: "___ you mind opening the window?", opts: ["Could", "Should", "Would", "Must"], a: 2, exp: "'Would you mind + -ing' is the standard polite request structure." },
+      { q: "She ___ be at home; her car isn't in the driveway.", opts: ["mustn't", "can't", "shouldn't", "wouldn't"], a: 1, exp: "Use 'can't' to express logical certainty that something is impossible." },
+      { q: "You ___ bring an umbrella; the forecast says it's sunny.", opts: ["mustn't", "don't have to", "can't", "shouldn't have"], a: 1, exp: "'Don't have to' means there is no obligation or necessity." },
+      { q: "When I was younger, I ___ run 10 kilometers easily.", opts: ["can", "could", "may", "shall"], a: 1, exp: "'Could' expresses general ability in the past." },
+      { q: "You look tired. You ___ get some rest.", opts: ["should", "would", "might", "have"], a: 0, exp: "'Should' is used to give advice or recommendations." },
+      { q: "He ___ have forgotten about the meeting; he's never late.", opts: ["must", "can", "should", "will"], a: 0, exp: "'Must have + past participle' expresses a strong logical deduction about the past." }
+    ]
+  },
+  {
+    lvl: 10, title: "Countable Nouns", tier: "Intermediate", tierClass: "t-int",
+    questions: [
+      { q: "There are ___ cars on the road today than yesterday.", opts: ["less", "fewer", "little", "much"], a: 1, exp: "Use 'fewer' with countable plural nouns ('cars')." },
+      { q: "Could you give me some ___ about the visa process?", opts: ["informations", "information", "an information", "inform"], a: 1, exp: "'Information' is uncountable in English and has no plural form." },
+      { q: "How ___ sugar do you take in your tea?", opts: ["many", "few", "much", "number"], a: 2, exp: "Use 'much' with uncountable nouns ('sugar')." },
+      { q: "The police ___ investigating the robbery.", opts: ["is", "are", "was", "has"], a: 1, exp: "'Police' is always treated as a plural noun in English ('The police are')." },
+      { q: "She has ___ luggage to carry by herself.", opts: ["too many", "too much", "a few", "several"], a: 1, exp: "'Luggage' is an uncountable noun, so use 'too much'." },
+      { q: "We only have ___ minutes left before the train leaves.", opts: ["a little", "a few", "much", "less"], a: 1, exp: "Use 'a few' with countable nouns ('minutes')." },
+      { q: "The news ___ very surprising to everyone.", opts: ["were", "are", "was", "have been"], a: 2, exp: "Although 'news' ends in -s, it is singular and uncountable ('The news was')." }
+    ]
+  },
+  {
+    lvl: 11, title: "Conditionals 1 & 2", tier: "Intermediate", tierClass: "t-int",
+    questions: [
+      { q: "If you heat ice, it ___.", opts: ["will melt", "melts", "melted", "would melt"], a: 1, exp: "Zero Conditional (If + present, present) is used for scientific facts." },
+      { q: "If it rains tomorrow, we ___ the picnic.", opts: ["cancel", "will cancel", "would cancel", "canceled"], a: 1, exp: "First Conditional (If + present, will + verb) is for real future possibilities." },
+      { q: "If I ___ rich, I would travel around the world.", opts: ["am", "was", "were", "will be"], a: 2, exp: "In the Second Conditional, 'were' is the proper subjunctive form for all subjects." },
+      { q: "She would buy a bigger house if she ___ more money.", opts: ["has", "had", "will have", "would have"], a: 1, exp: "Second Conditional uses Past Simple ('had') in the 'if' clause." },
+      { q: "I won't go to the party unless you ___ with me.", opts: ["come", "will come", "came", "would come"], a: 0, exp: "'Unless' means 'if not' and is followed by the Present Simple for future meaning." },
+      { q: "What would you do if you ___ a wallet on the street?", opts: ["find", "found", "will find", "had found"], a: 1, exp: "Hypothetical present/future questions use the Second Conditional ('found')." },
+      { q: "If he studies hard, he ___ the exam easily.", opts: ["passes", "will pass", "would pass", "passed"], a: 1, exp: "First Conditional predicts a likely future result ('will pass')." }
+    ]
+  },
+  {
+    lvl: 12, title: "Passive Voice", tier: "Intermediate", tierClass: "t-int",
+    questions: [
+      { q: "The Mona Lisa ___ by Leonardo da Vinci.", opts: ["painted", "was painted", "is painted", "has painted"], a: 1, exp: "Past Simple Passive ('was painted') is used when the focus is on the object." },
+      { q: "English ___ in many countries around the world.", opts: ["speaks", "is spoken", "spoke", "is speaking"], a: 1, exp: "Present Simple Passive ('is spoken') describes general facts." },
+      { q: "The new bridge ___ next year.", opts: ["will complete", "will be completed", "is completing", "completes"], a: 1, exp: "Future Passive uses 'will be + past participle'." },
+      { q: "My car ___ repaired at the mechanic right now.", opts: ["is", "is being", "was being", "has"], a: 1, exp: "Present Continuous Passive uses 'is being + past participle'." },
+      { q: "All the cookies ___ before I got home.", opts: ["had eaten", "had been eaten", "were eating", "have eaten"], a: 1, exp: "Past Perfect Passive ('had been eaten') shows an action completed before another past event." },
+      { q: "The windows need to ___ cleaned.", opts: ["be", "being", "been", "is"], a: 0, exp: "Infinitive passive structure: 'to be + past participle'." },
+      { q: "This letter must ___ today.", opts: ["send", "be sent", "sent", "be sending"], a: 1, exp: "Modal passive structure: 'modal + be + past participle'." },
+      { q: "Thousands of trees ___ planted since last spring.", opts: ["have been", "has been", "were", "are"], a: 0, exp: "Present Perfect Passive with plural subject ('trees') uses 'have been'." }
+    ]
+  },
+  {
+    lvl: 13, title: "Gerunds & Infinitives", tier: "Advanced", tierClass: "t-adv",
+    questions: [
+      { q: "She enjoys ___ novels in her free time.", opts: ["to read", "reading", "read", "to reading"], a: 1, exp: "The verb 'enjoy' is always followed by a gerund (-ing form)." },
+      { q: "He decided ___ a new career path.", opts: ["pursuing", "to pursue", "pursue", "pursued"], a: 1, exp: "The verb 'decide' is followed by a 'to'-infinitive." },
+      { q: "I look forward to ___ from you soon.", opts: ["hear", "hearing", "heard", "be heard"], a: 1, exp: "In 'look forward to', 'to' is a preposition, so it must be followed by a gerund ('hearing')." },
+      { q: "They stopped ___ because they were exhausted.", opts: ["to run", "running", "run", "ran"], a: 1, exp: "'Stop + -ing' means to quit an activity." },
+      { q: "Don't forget ___ the door before you leave.", opts: ["locking", "to lock", "lock", "locked"], a: 1, exp: "'Forget + to-infinitive' refers to a future responsibility you must remember to do." },
+      { q: "She avoids ___ junk food late at night.", opts: ["to eat", "eating", "eat", "eaten"], a: 1, exp: "'Avoid' is always followed by a gerund ('eating')." },
+      { q: "He admitted ___ the window by accident.", opts: ["to break", "breaking", "break", "broke"], a: 1, exp: "'Admit' is followed by a gerund ('breaking')." },
+      { q: "It's no use ___ over spilled milk.", opts: ["to cry", "crying", "cry", "cried"], a: 1, exp: "The idiom 'It's no use' is always followed by a gerund." }
+    ]
+  },
+  {
+    lvl: 14, title: "Relative Clauses", tier: "Advanced", tierClass: "t-adv",
+    questions: [
+      { q: "The woman ___ lives next door is a surgeon.", opts: ["which", "who", "whom", "whose"], a: 1, exp: "Use 'who' as the subject relative pronoun for people." },
+      { q: "That is the man ___ car was stolen yesterday.", opts: ["who", "whom", "whose", "which"], a: 2, exp: "'Whose' is the possessive relative pronoun." },
+      { q: "The book, ___ was published in 1925, is a classic.", opts: ["that", "which", "who", "what"], a: 1, exp: "Non-defining relative clauses (with commas) cannot use 'that'; use 'which'." },
+      { q: "To ___ should I address this letter?", opts: ["who", "whom", "whose", "which"], a: 1, exp: "Use 'whom' immediately after a preposition ('To whom')." },
+      { q: "This is the restaurant ___ we had our first date.", opts: ["which", "where", "that", "when"], a: 1, exp: "Use 'where' to refer to a place where an action happened." },
+      { q: "Everything ___ he said turned out to be true.", opts: ["which", "what", "that", "who"], a: 2, exp: "After indefinite pronouns like 'everything', use 'that' rather than 'which'." },
+      { q: "I remember the day ___ we first met.", opts: ["which", "where", "when", "whose"], a: 2, exp: "Use 'when' to refer to a time." },
+      { q: "The company ___ I work for is expanding globally.", opts: ["who", "whom", "which", "where"], a: 2, exp: "Because the preposition 'for' is at the end, 'which' refers to 'the company'." },
+      { q: "He failed the test, ___ surprised everyone.", opts: ["that", "what", "which", "who"], a: 2, exp: "Use 'which' after a comma to refer back to an entire preceding clause." }
+    ]
+  },
+  {
+    lvl: 15, title: "Agreement Mastery", tier: "Advanced", tierClass: "t-adv",
+    questions: [
+      { q: "Neither the manager nor the employees ___ aware of the change.", opts: ["was", "is", "were", "has been"], a: 2, exp: "With 'neither/nor', the verb agrees with the closer noun ('employees' -> plural 'were')." },
+      { q: "The box of vintage ornaments ___ stored in the attic.", opts: ["are", "were", "is", "have been"], a: 2, exp: "The core subject is 'The box' (singular), not 'ornaments'." },
+      { q: "Each of the students ___ given a certificate.", opts: ["were", "are", "was", "have"], a: 2, exp: "'Each' is singular and requires a singular verb ('was')." },
+      { q: "Ten miles ___ a long distance to walk in the heat.", opts: ["are", "were", "is", "have been"], a: 2, exp: "Measurements of distance, time, and money take singular verbs ('is')." },
+      { q: "The number of applicants ___ increased dramatically.", opts: ["have", "has", "are", "were"], a: 1, exp: "'The number of' takes a singular verb ('has')." },
+      { q: "A number of protesters ___ gathered outside the building.", opts: ["has", "is", "have", "was"], a: 2, exp: "'A number of' means 'many' and takes a plural verb ('have')." },
+      { q: "Mathematics ___ my favorite subject in high school.", opts: ["were", "are", "was", "have been"], a: 2, exp: "Academic subjects ending in -ics (Mathematics, Physics) are singular ('was')." },
+      { q: "The CEO, along with her assistants, ___ attending the summit.", opts: ["are", "is", "were", "have been"], a: 1, exp: "Parenthetical phrases like 'along with' do not change the number of the main subject ('is')." },
+      { q: "Everybody in the stadium ___ cheering loudly.", opts: ["were", "are", "was", "have been"], a: 2, exp: "Indefinite pronouns like 'everybody' are always singular ('was')." }
+    ]
+  },
+  {
+    lvl: 16, title: "Mixed Conditionals", tier: "Advanced", tierClass: "t-adv",
+    questions: [
+      { q: "If I had studied harder, I ___ the exam.", opts: ["would pass", "would have passed", "will pass", "had passed"], a: 1, exp: "Third Conditional (If + past perfect, would have + past participle) expresses unreal past situations." },
+      { q: "If she ___ earlier, she wouldn't have missed the flight.", opts: ["left", "had left", "would leave", "has left"], a: 1, exp: "Unreal past conditions require the Past Perfect ('had left')." },
+      { q: "If I had taken that job in Tokyo, I ___ in Japan now.", opts: ["would live", "would be living", "would have lived", "lived"], a: 1, exp: "Mixed Conditional: past condition affecting a present state ('would be living now')." },
+      { q: "Had I known you were coming, I ___ a cake.", opts: ["would bake", "will bake", "would have baked", "baked"], a: 2, exp: "'Had I known' is an inverted Third Conditional requiring 'would have baked'." },
+      { q: "If he weren't so afraid of flying, he ___ with us last week.", opts: ["would travel", "would have traveled", "traveled", "had traveled"], a: 1, exp: "Mixed Conditional: ongoing present trait affecting a past event ('would have traveled')." },
+      { q: "We ___ lost if we had brought a map.", opts: ["wouldn't get", "wouldn't have gotten", "didn't get", "hadn't gotten"], a: 1, exp: "Third Conditional negative result: 'wouldn't have gotten'." },
+      { q: "But for your help, we ___ succeeded.", opts: ["would never", "would never have", "will never", "had never"], a: 1, exp: "'But for' means 'If it hadn't been for' and pairs with 'would have + past participle'." },
+      { q: "If they hadn't missed the train, they ___ here by now.", opts: ["would be", "would have been", "will be", "were"], a: 0, exp: "Mixed Conditional: past action impacting the present moment ('would be here now')." },
+      { q: "I wish I ___ more attention during the lecture yesterday.", opts: ["paid", "had paid", "would pay", "pay"], a: 1, exp: "Use 'wish + Past Perfect' to express regret about the past." }
+    ]
+  },
+  {
+    lvl: 17, title: "Reported Speech", tier: "Mastery", tierClass: "t-mas",
+    questions: [
+      { q: "She said, 'I am tired.' -> She said that she ___ tired.", opts: ["is", "was", "has been", "were"], a: 1, exp: "Present Simple ('am') backshifts to Past Simple ('was') in reported speech." },
+      { q: "He asked me where ___.", opts: ["did I live", "I lived", "do I live", "lived I"], a: 1, exp: "Reported questions use statement word order (subject + verb) without auxiliary 'did'." },
+      { q: "They told us they ___ the project the previous day.", opts: ["finished", "had finished", "have finished", "finish"], a: 1, exp: "Past Simple ('finished') backshifts to Past Perfect ('had finished')." },
+      { q: "She asked if I ___ help her move.", opts: ["can", "could", "will", "shall"], a: 1, exp: "'Can' backshifts to 'could' in reported speech." },
+      { q: "The doctor advised me ___ more water.", opts: ["drink", "drinking", "to drink", "drank"], a: 2, exp: "Reporting verbs like 'advise' take 'object + to-infinitive'." },
+      { q: "He denied ___ the confidential files.", opts: ["to take", "taking", "take", "took"], a: 1, exp: "The reporting verb 'deny' is followed by a gerund ('taking')." },
+      { q: "She said she ___ call me the following day.", opts: ["will", "would", "can", "shall"], a: 1, exp: "'Will' backshifts to 'would' in reported speech." },
+      { q: "He warned the children ___ near the edge.", opts: ["not to go", "to not go", "don't go", "not going"], a: 0, exp: "Negative reported commands place 'not' before 'to' ('not to go')." },
+      { q: "She insisted on ___ for the entire dinner.", opts: ["to pay", "paying", "pay", "paid"], a: 1, exp: "'Insist on' is followed by a gerund ('paying')." },
+      { q: "He asked me whether I ___ been to Rome.", opts: ["have", "had", "was", "did"], a: 1, exp: "Present Perfect ('have been') backshifts to Past Perfect ('had been')." }
+    ]
+  },
+  {
+    lvl: 18, title: "Subjunctive Mood", tier: "Mastery", tierClass: "t-mas",
+    questions: [
+      { q: "The board recommended that he ___ appointed CEO.", opts: ["is", "was", "be", "will be"], a: 2, exp: "After verbs of recommendation, the mandative subjunctive uses the bare infinitive ('be')." },
+      { q: "It is essential that every passenger ___ a valid passport.", opts: ["has", "have", "had", "having"], a: 1, exp: "Adjectives of urgency ('essential') trigger the subjunctive base form ('have', not 'has')." },
+      { q: "She demanded that the refund ___ processed immediately.", opts: ["is", "be", "was", "were"], a: 1, exp: "Passive subjunctive uses 'be + past participle' ('be processed')." },
+      { q: "He acts as though he ___ the owner of the company.", opts: ["is", "were", "was", "has been"], a: 1, exp: "'As though' for unreal comparisons takes the past subjunctive 'were'." },
+      { q: "The judge ordered that the defendant ___ released.", opts: ["is", "be", "was", "were"], a: 1, exp: "'Ordered that' requires the subjunctive base form ('be')." },
+      { q: "It is crucial that she ___ on time for the interview.", opts: ["arrives", "arrive", "arrived", "arriving"], a: 1, exp: "'It is crucial that' triggers the mandative subjunctive ('arrive' without -s)." },
+      { q: "I suggest that he ___ his lawyer before signing.", opts: ["consults", "consult", "consulted", "consulting"], a: 1, exp: "'Suggest that' takes the base subjunctive form ('consult')." },
+      { q: "Long ___ the Queen!", opts: ["lives", "live", "lived", "living"], a: 1, exp: "Formulaic subjunctive expressions of wish use the base verb ('Long live')." },
+      { q: "It is imperative that the data ___ kept confidential.", opts: ["is", "are", "be", "was"], a: 2, exp: "'Imperative that' triggers the subjunctive 'be'." },
+      { q: "If need ___, we can reschedule the conference.", opts: ["is", "be", "was", "were"], a: 1, exp: "'If need be' is a fixed idiomatic subjunctive phrase." }
+    ]
+  },
+  {
+    lvl: 19, title: "Negative Inversion", tier: "Mastery", tierClass: "t-mas",
+    questions: [
+      { q: "Never ___ such a breathtaking sunset.", opts: ["I have seen", "have I seen", "I saw", "did I saw"], a: 1, exp: "Starting with a negative adverb ('Never') requires subject-auxiliary inversion ('have I seen')." },
+      { q: "Not only ___ late, but he also forgot his presentation.", opts: ["he was", "was he", "he is", "did he"], a: 1, exp: "'Not only' at the start of a clause triggers inversion ('was he')." },
+      { q: "Seldom ___ we encounter such dedication.", opts: ["do", "are", "have", "were"], a: 0, exp: "With Present Simple main verbs ('encounter'), negative inversion requires 'do/does'." },
+      { q: "Hardly had I closed my eyes ___ the phone rang.", opts: ["than", "when", "then", "after"], a: 1, exp: "The correlative pair is 'Hardly... when'." },
+      { q: "No sooner had she arrived ___ the meeting began.", opts: ["when", "than", "then", "that"], a: 1, exp: "'No sooner' always pairs with 'than'." },
+      { q: "Under no circumstances ___ open this door.", opts: ["you should", "should you", "you must", "mustn't you"], a: 1, exp: "Negative prepositional phrases ('Under no circumstances') require inversion ('should you')." },
+      { q: "Little ___ he know what awaited him.", opts: ["was", "did", "had", "does"], a: 1, exp: "'Little' used negatively at the start of a sentence in the past requires 'did'." },
+      { q: "Only after reading the contract ___ the hidden fee.", opts: ["I noticed", "did I notice", "I did notice", "noticed I"], a: 1, exp: "'Only after + clause' triggers inversion in the main clause ('did I notice')." },
+      { q: "Rarely ___ such resilience in a young athlete.", opts: ["one sees", "does one see", "one does see", "sees one"], a: 1, exp: "'Rarely' at the beginning requires auxiliary inversion ('does one see')." },
+      { q: "Nowhere else in the world ___ find this species.", opts: ["you will", "will you", "you can", "can't you"], a: 1, exp: "Negative place expressions ('Nowhere else') trigger inversion ('will you')." },
+      { q: "Scarcely ___ the stadium when it started pouring.", opts: ["we had left", "had we left", "we left", "did we left"], a: 1, exp: "'Scarcely' at the beginning requires inversion ('had we left')." }
+    ]
+  },
+  {
+    lvl: 20, title: "Grandmaster Gauntlet", tier: "Mastery", tierClass: "t-mas",
+    questions: [
+      { q: "Walking through the botanical garden, ___.", opts: ["the rare orchids amazed us", "we admired the rare orchids", "the fragrance filled the air", "a fountain appeared ahead"], a: 1, exp: "Avoid dangling modifiers: the subject after the comma ('we') must perform the action ('Walking')." },
+      { q: "Had it not been for the GPS, we ___ completely lost.", opts: ["would be", "would have been", "were", "had been"], a: 1, exp: "Inverted Third Conditional requires 'would have been'." },
+      { q: "The committee, as well as the chairperson, ___ divided on the issue.", opts: ["are", "were", "is", "have been"], a: 2, exp: "'The committee' is the singular main subject; 'as well as' is parenthetical." },
+      { q: "She is one of those rare leaders who ___ by example.", opts: ["leads", "lead", "is leading", "has led"], a: 1, exp: "The relative pronoun 'who' refers to 'leaders' (plural), so the verb must be plural ('lead')." },
+      { q: "By next December, they ___ married for twenty-five years.", opts: ["will be", "will have been", "are", "have been"], a: 1, exp: "Use Future Perfect ('will have been') for an action continuing up to a future point." },
+      { q: "He objected to ___ treated like a novice.", opts: ["be", "being", "been", "to be"], a: 1, exp: "'Object to' takes a gerund; the passive gerund form is 'being treated'." },
+      { q: "So complex ___ that few experts could decipher it.", opts: ["the code was", "was the code", "the code is", "did the code"], a: 1, exp: "'So + adjective' at the beginning of a sentence triggers inversion ('was the code')." },
+      { q: "Whomever you choose ___ fine with the rest of the team.", opts: ["are", "is", "were", "have been"], a: 1, exp: "The entire noun clause 'Whomever you choose' acts as a singular subject ('is')." },
+      { q: "I would rather you ___ smoke inside the apartment.", opts: ["don't", "didn't", "not", "won't"], a: 1, exp: "'Would rather + different subject' takes the Past Simple ('didn't') for present/future preferences." },
+      { q: "The data collected from the trials ___ conclusive.", opts: ["is", "are", "was", "has been"], a: 1, exp: "In formal academic English, 'data' is the plural of 'datum' and takes 'are'." },
+      { q: "Not until the sun rose ___ the extent of the storm damage.", opts: ["we saw", "did we see", "we did see", "saw we"], a: 1, exp: "'Not until' at the start requires inversion in the main clause ('did we see')." },
+      { q: "Exhausted from the marathon, ___ collapsed onto the couch.", opts: ["his legs", "the runner", "sleep", "the finish line"], a: 1, exp: "The participial phrase 'Exhausted from the marathon' must modify the person ('the runner')." }
+    ]
+  }
+];
+
+const ALL_QUESTIONS = LEVELS.flatMap(l => l.questions);
+
+// ==================== RANK SYSTEM & USER DATA ====================
+const RANKS = [
+  { name: "Bronze", min: 0, class: "r-bronze", icon: "🥉" },
+  { name: "Silver", min: 200, class: "r-silver", icon: "🥈" },
+  { name: "Gold", min: 450, class: "r-gold", icon: "🥇" },
+  { name: "Platinum", min: 750, class: "r-platinum", icon: "💠" },
+  { name: "Diamond", min: 1100, class: "r-diamond", icon: "💎" },
+  { name: "Grandmaster", min: 1500, class: "r-master", icon: "👑" }
+];
+
+function getRank(rp) {
+  let current = RANKS[0];
+  for (const r of RANKS) {
+    if (rp >= r.min) current = r;
+  }
+  return current;
+}
+
+let userData = JSON.parse(localStorage.getItem('grammarQuestRanked')) || {
+  name: "Player",
+  rp: 100,
+  wins: 0,
+  losses: 0,
+  unlocked: 1,
+  stars: {},
+  theme: 'light' // Default theme
+};
+
+function saveUser() {
+  localStorage.setItem('grammarQuestRanked', JSON.stringify(userData));
+}
+
+// Apply saved theme on load
+if (userData.theme === 'dark') {
+  document.documentElement.setAttribute('data-theme', 'dark');
+}
+
+let activeTab = 'solo'; // 'solo' | '1v1' | 'rank' | 'settings'
+let peer = null;
+let conn = null;
+let isHost = false;
+
+let mode = 'solo';
+let matchQuestions = [];
+let qIndex = 0;
+let myScore = 0;
+let oppScore = 0;
+let oppName = "Opponent";
+let oppRp = 100;
+let oppFinished = false;
+let iFinished = false;
+let questionStartTime = 0;
+let currentSoloLvl = null;
+
+let ppTurn = 1;
+let ppP1Score = 0;
+let ppP2Score = 0;
+
+const app = document.getElementById('app');
+
+// ==================== UI SHELL & TABS ====================
+function renderShell(contentHtml) {
+  const rank = getRank(userData.rp);
+  app.innerHTML = `
+    <div class="top-bar">
+      <div>
+        <h1>Grammar Quest</h1>
+        <span style="font-size:0.82rem; color:var(--muted);">👤 ${userData.name} • ${userData.wins}W - ${userData.losses}L</span>
+      </div>
+      <div class="rank-pill ${rank.class}">
+        ${rank.icon} ${rank.name} (${userData.rp} RP)
+      </div>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="tab-btn ${activeTab === 'solo' ? 'active' : ''}" onclick="switchTab('solo')">🗺️ Levels</button>
+      <button class="tab-btn ${activeTab === '1v1' ? 'active' : ''}" onclick="switchTab('1v1')">⚔️ 1v1</button>
+      <button class="tab-btn ${activeTab === 'rank' ? 'active' : ''}" onclick="switchTab('rank')">🏆 Rank</button>
+      <button class="tab-btn ${activeTab === 'settings' ? 'active' : ''}" onclick="switchTab('settings')">⚙️ Settings</button>
+    </div>
+
+    <div id="view-body">${contentHtml}</div>
+  `;
+}
+
+function switchTab(tab) {
+  if (peer) { peer.destroy(); peer = null; conn = null; }
+  activeTab = tab;
+  if (tab === 'solo') renderSoloMap();
+  if (tab === '1v1') render1v1Lobby();
+  if (tab === 'rank') renderRankView();
+  if (tab === 'settings') renderSettingsView();
+}
+
+// ==================== TAB 1: SOLO MAP ====================
+function renderSoloMap() {
+  const totalStars = Object.values(userData.stars).reduce((a, b) => a + b, 0);
+  let gridHtml = `<div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:0.9rem; font-weight:700;">
+    <span>Campaign Progress</span>
+    <span style="color:var(--gold);">⭐ ${totalStars} / 60 Stars</span>
+  </div><div class="level-grid">`;
+
+  LEVELS.forEach(item => {
+    const isUnlocked = item.lvl <= userData.unlocked;
+    const earned = userData.stars[item.lvl] || 0;
+    const starStr = isUnlocked ? '★'.repeat(earned) + '☆'.repeat(3 - earned) : '🔒';
+    gridHtml += `
+      <div class="lvl-card ${!isUnlocked ? 'locked' : ''} ${earned > 0 ? 'completed' : ''}" 
+           onclick="${isUnlocked ? `startSolo(${item.lvl})` : ''}">
+        <span class="tier-tag ${item.tierClass}">${item.tier}</span>
+        <div class="lvl-num" style="margin-top:6px;">Level ${item.lvl}</div>
+        <div class="lvl-title">${item.title}</div>
+        <div class="lvl-meta">${item.questions.length} Qs</div>
+        <div class="stars">${starStr}</div>
+      </div>
+    `;
+  });
+  gridHtml += `</div>`;
+  renderShell(gridHtml);
+}
+
+function startSolo(lvlNum) {
+  mode = 'solo';
+  currentSoloLvl = LEVELS.find(l => l.lvl === lvlNum);
+  matchQuestions = currentSoloLvl.questions;
+  qIndex = 0;
+  myScore = 0;
+  renderQuestion();
+}
+
+// ==================== TAB 2: 1v1 MULTIPLAYER ====================
+function render1v1Lobby() {
+  renderShell(`
+    <p style="color:var(--muted); font-size:0.92rem; margin-bottom:12px;">
+      Play a 10-question Ranked Duel against a friend on the same network or online! Faster answers earn speed bonuses.
+    </p>
+    <div class="arena-grid">
+      <div class="arena-card">
+        <h3>🏠 Host a Match</h3>
+        <p style="font-size:0.85rem; color:var(--muted); margin:8px 0 16px;">Create a room code and share it with your friend.</p>
+        <button class="btn" onclick="hostRoom()">Create Room</button>
+      </div>
+
+      <div class="arena-card">
+        <h3>🔗 Join a Match</h3>
+        <p style="font-size:0.85rem; color:var(--muted); margin:8px 0 12px;">Enter the 4-digit code from your friend's screen.</p>
+        <input type="text" id="joinCodeInput" placeholder="e.g. 4821" maxlength="4" style="text-align:center; letter-spacing:3px; font-size:1.2rem;">
+        <button class="btn btn-outline" onclick="joinRoom()">Join Room</button>
+      </div>
+    </div>
+
+    <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:16px; text-align:center;">
+      <p style="font-size:0.85rem; color:var(--muted); margin-bottom:8px;">Sharing one device?</p>
+      <button class="btn btn-sm" onclick="startPassAndPlay()">📱 Start Same-Device Pass & Play 1v1</button>
+    </div>
+    <div id="net-status" style="margin-top:12px; text-align:center; font-weight:700; color:var(--primary);"></div>
+  `);
+}
+
+function hostRoom() {
+  const status = document.getElementById('net-status');
+  status.textContent = "Generating Room Code...";
+  
+  const shortCode = Math.floor(1000 + Math.random() * 9000).toString();
+  const peerId = "gq-duel-" + shortCode;
+
+  peer = new Peer(peerId);
+  isHost = true;
+
+  peer.on('open', () => {
+    document.getElementById('view-body').innerHTML = `
+      <div style="text-align:center; padding:20px 0;">
+        <span class="tier-tag t-adv">Waiting for Opponent</span>
+        <div class="room-code-box">${shortCode}</div>
+        <p style="color:var(--muted); margin-bottom:20px;">Tell your friend to open <strong>1v1</strong> and enter code <strong>${shortCode}</strong>.</p>
+        <button class="btn btn-sm" onclick="switchTab('1v1')">Cancel</button>
+      </div>
+    `;
+  });
+
+  peer.on('connection', (connection) => {
+    conn = connection;
+    setupConnection();
+  });
+
+  peer.on('error', (err) => {
+    status.style.color = "var(--wrong)";
+    status.textContent = "Connection error: " + err.type;
+  });
+}
+
+function joinRoom() {
+  const code = document.getElementById('joinCodeInput').value.trim();
+  const status = document.getElementById('net-status');
+  if (code.length !== 4) {
+    status.style.color = "var(--wrong)";
+    status.textContent = "Please enter a valid 4-digit room code.";
+    return;
+  }
+
+  status.style.color = "var(--primary)";
+  status.textContent = "Connecting to room " + code + "...";
+
+  peer = new Peer();
+  isHost = false;
+
+  peer.on('open', () => {
+    conn = peer.connect("gq-duel-" + code);
+    setupConnection();
+  });
+
+  peer.on('error', () => {
+    status.style.color = "var(--wrong)";
+    status.textContent = "Could not find room " + code + ". Check the code and try again.";
+  });
+}
+
+function setupConnection() {
+  conn.on('open', () => {
+    conn.send({ type: 'HELLO', name: userData.name, rp: userData.rp });
+
+    if (isHost) {
+      const shuffled = [...ALL_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, 10);
+      matchQuestions = shuffled;
+      conn.send({ type: 'START_MATCH', questions: shuffled });
+      begin1v1Match();
+    }
+  });
+
+  conn.on('data', (data) => {
+    if (data.type === 'HELLO') {
+      oppName = data.name;
+      oppRp = data.rp;
+      updateVersusBanner();
+    }
+    if (data.type === 'START_MATCH') {
+      matchQuestions = data.questions;
+      begin1v1Match();
+    }
+    if (data.type === 'SCORE_UPDATE') {
+      oppScore = data.score;
+      updateVersusBanner();
+    }
+    if (data.type === 'FINISHED') {
+      oppScore = data.score;
+      oppFinished = true;
+      updateVersusBanner();
+      if (iFinished) show1v1Results();
+    }
+  });
+
+  conn.on('close', () => {
+    if (!iFinished && mode === '1v1') {
+      alert("Opponent disconnected!");
+      switchTab('1v1');
+    }
+  });
+}
+
+function begin1v1Match() {
+  mode = '1v1';
+  qIndex = 0;
+  myScore = 0;
+  oppScore = 0;
+  iFinished = false;
+  oppFinished = false;
+  renderQuestion();
+}
+
+function updateVersusBanner() {
+  const myEl = document.getElementById('v-my-score');
+  const oppEl = document.getElementById('v-opp-score');
+  const oppNameEl = document.getElementById('v-opp-name');
+  if (myEl) myEl.textContent = myScore;
+  if (oppEl) oppEl.textContent = oppScore;
+  if (oppNameEl) oppNameEl.textContent = `${oppName} (${getRank(oppRp).name})`;
+}
+
+function startPassAndPlay() {
+  mode = 'passplay';
+  ppTurn = 1;
+  ppP1Score = 0;
+  ppP2Score = 0;
+  matchQuestions = [...ALL_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, 6);
+  qIndex = 0;
+  myScore = 0;
+  renderQuestion();
+}
+
+// ==================== QUIZ ENGINE ====================
+function renderQuestion() {
+  const qObj = matchQuestions[qIndex];
+  const totalQ = matchQuestions.length;
+  const pct = (qIndex / totalQ) * 100;
+  questionStartTime = Date.now();
+
+  let topBanner = '';
+  if (mode === '1v1') {
+    topBanner = `
+      <div class="versus-bar">
+        <div class="p-box">
+          <span class="p-name">${userData.name} (You)</span>
+          <span class="p-score" id="v-my-score">${myScore}</span>
+        </div>
+        <div class="vs-badge">VS</div>
+        <div class="p-box p-opp" style="text-align:right;">
+          <span class="p-name" id="v-opp-name">${oppName} (${getRank(oppRp).name})</span>
+          <span class="p-score" id="v-opp-score">${oppScore}</span>
+        </div>
+      </div>
+    `;
+  } else if (mode === 'passplay') {
+    topBanner = `
+      <div class="versus-bar">
+        <div class="p-box"><span class="p-name">Player 1</span><span class="p-score">${ppP1Score}</span></div>
+        <div class="vs-badge">Player ${ppTurn}'s Turn</div>
+        <div class="p-box p-opp" style="text-align:right;"><span class="p-name">Player 2</span><span class="p-score">${ppP2Score}</span></div>
+      </div>
+    `;
+  } else {
+    topBanner = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <span class="tier-tag ${currentSoloLvl.tierClass}">Level ${currentSoloLvl.lvl}: ${currentSoloLvl.title}</span>
+        <button class="btn btn-sm" onclick="renderSoloMap()">✕ Exit</button>
+      </div>
+    `;
+  }
+
+  app.innerHTML = `
+    ${topBanner}
+    <div class="stats">
+      <span>Question ${qIndex + 1} of ${totalQ}</span>
+      <span>${mode === 'solo' ? `Score: ${myScore}` : '⚡ Speed Bonus Active'}</span>
+    </div>
+    <div class="progress-wrap"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="q-text">${qObj.q.replace('___', '<span class="blank">___</span>')}</div>
+    <div id="opts"></div>
+    <div class="explanation" id="exp"></div>
+    <button class="btn" id="nextBtn" style="display:none; margin-top:14px;" onclick="nextQuestion()">
+      ${qIndex + 1 === totalQ ? 'Finish' : 'Next Question →'}
+    </button>
+  `;
+
+  const optsDiv = document.getElementById('opts');
+  qObj.opts.forEach((optText, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'opt-btn';
+    btn.textContent = optText;
+    btn.onclick = () => handleAnswer(idx, btn);
+    optsDiv.appendChild(btn);
+  });
+}
+
+function handleAnswer(selectedIdx, btn) {
+  const qObj = matchQuestions[qIndex];
+  const buttons = document.querySelectorAll('.opt-btn');
+  buttons.forEach(b => b.disabled = true);
+
+  const blank = document.querySelector('.blank');
+  if (blank) blank.textContent = qObj.opts[qObj.a];
+
+  const exp = document.getElementById('exp');
+  const elapsedSec = (Date.now() - questionStartTime) / 1000;
+
+  if (selectedIdx === qObj.a) {
+    btn.classList.add('correct');
+    btn.innerHTML += '<span>✓</span>';
+    
+    if (mode === 'solo') {
+      myScore++;
+    } else {
+      const speedBonus = Math.max(0, Math.round(50 - elapsedSec * 5));
+      myScore += (100 + speedBonus);
+    }
+
+    exp.className = 'explanation show exp-ok';
+    exp.innerHTML = `<strong>Correct!</strong> ${qObj.exp}`;
+  } else {
+    btn.classList.add('wrong');
+    btn.innerHTML += '<span>✗</span>';
+    buttons[qObj.a].classList.add('correct');
+    buttons[qObj.a].innerHTML += '<span>✓</span>';
+    exp.className = 'explanation show exp-no';
+    exp.innerHTML = `<strong>Incorrect.</strong> ${qObj.exp}`;
+  }
+
+  if (mode === '1v1' && conn) {
+    conn.send({ type: 'SCORE_UPDATE', score: myScore });
+    updateVersusBanner();
+  }
+
+  document.querySelector('.progress-fill').style.width = `${((qIndex + 1) / matchQuestions.length) * 100}%`;
+  document.getElementById('nextBtn').style.display = 'block';
+}
+
+function nextQuestion() {
+  qIndex++;
+  if (qIndex < matchQuestions.length) {
+    renderQuestion();
+  } else {
+    if (mode === 'solo') finishSoloLevel();
+    else if (mode === '1v1') finish1v1Match();
+    else if (mode === 'passplay') finishPassPlayTurn();
+  }
+}
+
+function finishSoloLevel() {
+  const totalQ = matchQuestions.length;
+  const pct = myScore / totalQ;
+  let stars = pct === 1 ? 3 : pct >= 0.8 ? 2 : pct >= 0.6 ? 1 : 0;
+  const passed = stars >= 1;
+  let rpGain = 0;
+
+  if (passed) {
+    if (!userData.stars[currentSoloLvl.lvl] || stars > userData.stars[currentSoloLvl.lvl]) {
+      userData.stars[currentSoloLvl.lvl] = stars;
+      rpGain = currentSoloLvl.lvl * 5;
+      userData.rp += rpGain;
+    }
+    if (currentSoloLvl.lvl === userData.unlocked && userData.unlocked < 20) {
+      userData.unlocked++;
+    }
+    saveUser();
+  }
+
+  renderShell(`
+    <div class="result-box">
+      <span class="tier-tag ${currentSoloLvl.tierClass}">Level ${currentSoloLvl.lvl} ${passed ? 'Cleared!' : 'Failed'}</span>
+      <div class="big-score">${myScore} / ${totalQ}</div>
+      <div class="stars" style="font-size:2rem; margin-bottom:10px;">${'★'.repeat(stars) + '☆'.repeat(3 - stars)}</div>
+      ${rpGain > 0 ? `<div class="rp-change rp-up">+${rpGain} Rank Points</div>` : ''}
+      <p style="color:var(--muted); margin-bottom:20px;">
+        ${passed ? 'Next level unlocked!' : 'Score at least 60% to unlock the next level.'}
+      </p>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-sm" style="flex:1; padding:14px;" onclick="renderSoloMap()">Level Map</button>
+        ${passed && currentSoloLvl.lvl < 20 
+          ? `<button class="btn" style="flex:2;" onclick="startSolo(${currentSoloLvl.lvl + 1})">Next Level (${currentSoloLvl.lvl + 1}) →</button>`
+          : `<button class="btn" style="flex:2;" onclick="startSolo(${currentSoloLvl.lvl})">Retry Level</button>`}
+      </div>
+    </div>
+  `);
+}
+
+function finish1v1Match() {
+  iFinished = true;
+  if (conn) conn.send({ type: 'FINISHED', score: myScore });
+
+  if (!oppFinished) {
+    app.innerHTML = `
+      <div class="result-box" style="padding:40px 0;">
+        <h2>You Finished!</h2>
+        <div class="big-score">${myScore} pts</div>
+        <p style="color:var(--muted); margin-top:10px;">Waiting for <strong>${oppName}</strong> to finish...</p>
+      </div>
+    `;
+  } else {
+    show1v1Results();
+  }
+}
+
+function show1v1Results() {
+  const won = myScore > oppScore;
+  const tie = myScore === oppScore;
+  const rpDelta = won ? 35 : tie ? 10 : -20;
+
+  userData.rp = Math.max(0, userData.rp + rpDelta);
+  if (won) userData.wins++;
+  else if (!tie) userData.losses++;
+  saveUser();
+
+  const newRank = getRank(userData.rp);
+
+  renderShell(`
+    <div class="result-box">
+      <h2 style="font-size:1.8rem; color:${won ? 'var(--correct)' : tie ? 'var(--primary)' : 'var(--wrong)'};">
+        ${won ? '🏆 VICTORY!' : tie ? '🤝 DRAW!' : '💀 DEFEAT'}
+      </h2>
+      <div style="display:flex; justify-content:space-around; margin:20px 0; background:var(--tab-bg); padding:16px; border-radius:12px; border:1px solid var(--border);">
+        <div>
+          <div style="font-size:0.85rem; color:var(--muted);">${userData.name} (You)</div>
+          <div style="font-size:2rem; font-weight:900; color:var(--primary);">${myScore}</div>
+        </div>
+        <div>
+          <div style="font-size:0.85rem; color:var(--muted);">${oppName}</div>
+          <div style="font-size:2rem; font-weight:900; color:var(--text);">${oppScore}</div>
+        </div>
+      </div>
+
+      <div class="rp-change ${rpDelta >= 0 ? 'rp-up' : 'rp-down'}">
+        ${rpDelta >= 0 ? `+${rpDelta}` : rpDelta} RP • Current Rank: ${newRank.icon} ${newRank.name} (${userData.rp} RP)
+      </div>
+
+      <button class="btn" onclick="switchTab('1v1')">Back to 1v1 Arena</button>
+    </div>
+  `);
+}
+
+function finishPassPlayTurn() {
+  if (ppTurn === 1) {
+    ppP1Score = myScore;
+    ppTurn = 2;
+    qIndex = 0;
+    myScore = 0;
+    matchQuestions = [...matchQuestions].sort(() => Math.random() - 0.5);
+    app.innerHTML = `
+      <div class="result-box" style="padding:30px 0;">
+        <h2>Player 1 Scored: ${ppP1Score} pts</h2>
+        <p style="color:var(--muted); margin:12px 0 24px;">Pass device to <strong>Player 2</strong>!</p>
+        <button class="btn" onclick="renderQuestion()">Start Player 2's Turn →</button>
+      </div>
+    `;
+  } else {
+    ppP2Score = myScore;
+    const winner = ppP1Score > ppP2Score ? "Player 1 Wins!" : ppP2Score > ppP1Score ? "Player 2 Wins!" : "It's a Tie!";
+    renderShell(`
+      <div class="result-box">
+        <h2>🏆 ${winner}</h2>
+        <div style="display:flex; justify-content:space-around; margin:20px 0; background:var(--tab-bg); padding:16px; border-radius:12px; border:1px solid var(--border);">
+          <div><div style="color:var(--muted);">Player 1</div><div style="font-size:2rem; font-weight:900;">${ppP1Score}</div></div>
+          <div><div style="color:var(--muted);">Player 2</div><div style="font-size:2rem; font-weight:900;">${ppP2Score}</div></div>
+        </div>
+        <button class="btn" onclick="switchTab('1v1')">Done</button>
+      </div>
+    `);
+  }
+}
+
+// ==================== TAB 3: RANK VIEW ====================
+function renderRankView() {
+  const currentRank = getRank(userData.rp);
+  let ladderHtml = RANKS.map(r => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; border-radius:10px; margin-bottom:8px; border:2px solid ${r.name === currentRank.name ? 'var(--primary)' : 'var(--border)'}; background:${r.name === currentRank.name ? 'var(--card-hover)' : 'var(--card)'};">
+      <span style="font-weight:800;">${r.icon} ${r.name}</span>
+      <span style="font-size:0.85rem; color:var(--muted); font-weight:700;">${r.min}+ RP</span>
+    </div>
+  `).join('');
+
+  renderShell(`
+    <div style="margin-bottom:20px;">
+      <label style="font-size:0.85rem; font-weight:700; color:var(--muted); display:block; margin-bottom:6px;">Your Display Name</label>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="nameInput" value="${userData.name}" maxlength="16" style="margin:0;">
+        <button class="btn" style="width:auto;" onclick="saveName()">Save</button>
+      </div>
+    </div>
+
+    <h3 style="margin-bottom:10px; font-size:1rem;">Competitive Rank Tiers</h3>
+    ${ladderHtml}
+
+    <div style="margin-top:16px; text-align:right;">
+      <button class="btn btn-sm" onclick="resetAll()">Reset All Stats & Rank</button>
+    </div>
+  `);
+}
+
+function saveName() {
+  const val = document.getElementById('nameInput').value.trim();
+  if (val) {
+    userData.name = val;
+    saveUser();
+    renderRankView();
+  }
+}
+
+function resetAll() {
+  if (confirm("Reset your Rank Points, record, and progress?")) {
+    userData = { name: "Player", rp: 100, wins: 0, losses: 0, unlocked: 1, stars: {}, theme: userData.theme };
+    saveUser();
+    renderRankView();
+  }
+}
+
+// ==================== TAB 4: SETTINGS ROOM (THEME TOGGLE) ====================
+function renderSettingsView() {
+  const isDark = userData.theme === 'dark';
+  renderShell(`
+    <h3 style="margin-bottom:16px; font-size:1.1rem;">Display Settings</h3>
+    
+    <div class="setting-item">
+      <div>
+        <div style="font-weight:700;">Appearance Mode</div>
+        <div style="font-size:0.82rem; color:var(--muted);">Switch between Light Mode and Dark Mode</div>
+      </div>
+      <div class="toggle-switch" onclick="toggleTheme()">
+        <div class="toggle-option ${!isDark ? 'active' : ''}">☀️ Light</div>
+        <div class="toggle-option ${isDark ? 'active' : ''}">🌙 Dark</div>
+      </div>
+    </div>
+
+    <div style="margin-top:24px; border-top:1px solid var(--border); padding-top:16px;">
+      <h3 style="margin-bottom:8px; font-size:1rem;">About Grammar Quest</h3>
+      <p style="font-size:0.88rem; color:var(--muted); line-height:1.5;">
+        Version 2.5 • Includes 20 Progressive Levels, 1v1 P2P Duels, Ranked Tiers, and Theme Customization.
+      </p>
+    </div>
+  `);
+}
+
+function toggleTheme() {
+  userData.theme = userData.theme === 'dark' ? 'light' : 'dark';
+  saveUser();
+  
+  if (userData.theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  
+  renderSettingsView();
+}
+
+// Boot
+renderSoloMap();
+</script>
+</body>
+</html>
